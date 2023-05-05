@@ -210,6 +210,37 @@ func resolveVaultTestCredentials(config *StepConfig, client vaultClient) {
 	}
 }
 
+func resolveVaultCredentialsWrapper(config *StepConfig, client vaultClient) {
+	log.Entry().Debugln("resolveVaultCredentialsWrapper")
+	switch config.Config[vaultCredentialPath].(type) {
+	case string:
+		log.Entry().Debugln("string")
+		resolveVaultCredentials(config, client)
+	case []interface{}:
+		log.Entry().Debugln("[]interface{}")
+		vaultCredentialPathCopy := config.Config[vaultCredentialPath]
+		vaultCredentialKeysCopy := config.Config[vaultCredentialKeys]
+
+		if _, ok := vaultCredentialKeysCopy.([]interface{}); !ok || len(vaultCredentialKeysCopy.([]interface{})) != len(vaultCredentialPathCopy.([]interface{})) {
+			log.Entry().Debugf("Not fetching credentials from vault since they are not (properly) configured")
+			return
+		}
+
+		for i := 0; i < len(vaultCredentialPathCopy.([]interface{})); i++ {
+			config.Config[vaultCredentialPath] = vaultCredentialPathCopy.([]interface{})[i]
+			config.Config[vaultCredentialKeys] = vaultCredentialKeysCopy.([]interface{})[i]
+			resolveVaultCredentials(config, client)
+		}
+
+		config.Config[vaultCredentialPath] = vaultCredentialPathCopy
+		config.Config[vaultCredentialKeys] = vaultCredentialKeysCopy
+		log.Entry().Debugln("resolveVaultCredentialsWrapper end")
+	default:
+		log.Entry().Debugf("Not fetching credentials from vault since they are not (properly) configured")
+		return
+	}
+}
+
 func resolveVaultCredentials(config *StepConfig, client vaultClient) {
 	credPath, pathOk := config.Config[vaultCredentialPath].(string)
 	keys := getCredentialKeys(config)
