@@ -521,6 +521,7 @@ func runGolangBuildPerArchitecture(config *golangBuildOptions, goModFile *modfil
 		}
 	} else {
 		// use default name in case no name is defined via Output
+		log.Entry().Debugln(goModFile == nil)
 		binaryName := path.Base(goModFile.Module.Mod.Path)
 		binaryNames = append(binaryNames, binaryName)
 	}

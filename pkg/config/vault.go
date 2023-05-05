@@ -173,10 +173,12 @@ func resolveVaultReference(ref *ResourceReference, config *StepConfig, client va
 }
 
 func resolveVaultCredentialsWrapper(config *StepConfig, client vaultClient) {
+	log.Entry().Debugln("resolveVaultCredentialsWrapper")
 	resolveVaultCredentialsWrapperBase(config, client, vaultCredentialPath, vaultCredentialKeys, resolveVaultCredentials)
 }
 
 func resolveVaultTestCredentialsWrapper(config *StepConfig, client vaultClient) {
+	log.Entry().Debugln("resolveVaultTestCredentialsWrapper")
 	resolveVaultCredentialsWrapperBase(config, client, vaultTestCredentialPath, vaultTestCredentialKeys, resolveVaultTestCredentials)
 }
 
@@ -261,14 +263,14 @@ func resolveVaultCredentialsBase(
 }
 
 func populateTestCredentialsAsEnvs(config *StepConfig, secret map[string]string, keys []string) (matched bool) {
-	return populateCredentialsAsEnvsBase(config, secret, keys, vaultTestCredentialEnvPrefix, vaultTestCredentialEnvPrefixDefault, true)
+	return populateCredentialsAsEnvsBase(config, secret, keys, vaultTestCredentialEnvPrefix, vaultTestCredentialEnvPrefixDefault)
 }
 
 func populateCredentialsAsEnvs(config *StepConfig, secret map[string]string, keys []string) (matched bool) {
-	return populateCredentialsAsEnvsBase(config, secret, keys, vaultCredentialEnvPrefix, VaultCredentialEnvPrefixDefault, false)
+	return populateCredentialsAsEnvsBase(config, secret, keys, vaultCredentialEnvPrefix, VaultCredentialEnvPrefixDefault)
 }
 
-func populateCredentialsAsEnvsBase(config *StepConfig, secret map[string]string, keys []string, vaultPrefix, vaultPrefixDefault string, test bool) (matched bool) {
+func populateCredentialsAsEnvsBase(config *StepConfig, secret map[string]string, keys []string, vaultPrefix, vaultPrefixDefault string) (matched bool) {
 	vaultCredentialEnvPrefix, ok := config.Config[vaultPrefix].(string)
 	isCredentialEnvPrefixDefault := false
 	if !ok || len(vaultCredentialEnvPrefix) == 0 {
@@ -279,13 +281,13 @@ func populateCredentialsAsEnvsBase(config *StepConfig, secret map[string]string,
 	for secretKey, secretValue := range secret {
 		for _, key := range keys {
 			if secretKey == key {
-				registerAndSetEnv(vaultCredentialEnvPrefix, secretKey, secretValue, test)
+				registerAndSetEnv(vaultCredentialEnvPrefix, secretKey, secretValue)
 				matched = true
 
 				// we always create a standard env variable with the default prefix so that
 				// we can always refer to it in steps if its to be hard-coded
-				if !isCredentialEnvPrefixDefault && !test {
-					registerAndSetEnv(vaultPrefixDefault, secretKey, secretValue, test)
+				if !isCredentialEnvPrefixDefault {
+					registerAndSetEnv(vaultPrefixDefault, secretKey, secretValue)
 				}
 			}
 		}
@@ -294,7 +296,7 @@ func populateCredentialsAsEnvsBase(config *StepConfig, secret map[string]string,
 	return
 }
 
-func registerAndSetEnv(prefix, key, value string, test bool) {
+func registerAndSetEnv(prefix, key, value string) {
 	// Register the secret
 	log.RegisterSecret(value)
 
@@ -302,11 +304,6 @@ func registerAndSetEnv(prefix, key, value string, test bool) {
 	envVariable := prefix + ConvertEnvVar(key)
 	log.Entry().Debugf("Exposing general purpose credential '%v' as '%v'", key, envVariable)
 	os.Setenv(envVariable, value)
-
-	// no need to register for test base64 encoding
-	if test {
-		return
-	}
 
 	// Register and set the base64-encoded environment variable.
 	base64Value := piperutils.EncodeString(value)
